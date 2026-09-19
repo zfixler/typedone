@@ -1,0 +1,24 @@
+.terminal-shell {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  width: min(72rem, 100%);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-6) 0;
+}
+
+.command-bar {
+  grid-row: 4;
+  position: sticky;
+  bottom: 0;
+}
+
+.terminal-output {
+  grid-row: 3;
+}
+
+@media (max-width: 42rem) {
+  .terminal-shell {
+    padding: var(--space-3) var(--space-3) 0;
+  }
+}
