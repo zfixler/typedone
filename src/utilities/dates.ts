@@ -25,6 +25,20 @@ const pad = (value: number): string => String(value).padStart(2, '0');
 export const formatLocalDate = (date: Date): string =>
   `${String(date.getFullYear())}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
+export function formatFriendlyDate(value: string, now: Date = new Date()): string {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+  const tomorrow = addLocalDays(today, 1);
+  if (value === formatLocalDate(today)) return 'Today';
+  if (value === formatLocalDate(tomorrow)) return 'Tomorrow';
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1, 12);
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: year === today.getFullYear() ? undefined : 'numeric',
+  }).format(date);
+}
+
 const daysInMonth = (year: number, month: number): number => new Date(year, month, 0, 12).getDate();
 
 const isRealDate = (year: number, month: number, day: number): boolean =>

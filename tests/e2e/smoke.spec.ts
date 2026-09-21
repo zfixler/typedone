@@ -7,6 +7,28 @@ test('loads the application shell', async ({ page }) => {
   await expect(page.getByRole('textbox', { name: 'Command', exact: true })).toBeFocused();
 });
 
+test('onboards a first-time user and undoes task completion', async ({ page }) => {
+  await page.goto('/');
+  const command = page.getByRole('textbox', { name: 'Command', exact: true });
+
+  await page.getByRole('button', { name: '1. Add a task' }).click();
+  await expect(command).toHaveValue('add ');
+  await command.fill('add Keep this task');
+  await command.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible();
+  await expect(page.getByText('1 task', { exact: true })).toBeVisible();
+
+  await command.fill('/done 1');
+  await command.press('Enter');
+  await expect(page.getByRole('button', { name: 'Complete Keep this task' })).toBeHidden();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByRole('button', { name: 'Complete Keep this task' })).toBeVisible();
+
+  const status = page.getByRole('region', { name: 'Command status' });
+  await status.getByRole('button', { name: 'Dismiss status' }).click();
+  await expect(status).toBeHidden();
+});
+
 test('creates, persists, completes, and restores a task through commands', async ({ page }) => {
   await page.goto('/');
   const command = page.getByRole('textbox', { name: 'Command', exact: true });
@@ -67,7 +89,7 @@ test('adds a task to the current user directory without a directory flag', async
   await command.press('Enter');
   await expect(page.getByText('~/Work >')).toBeVisible();
 
-  await command.fill('add Current directory task');
+  await command.fill('add "Current directory task"');
   await command.press('Enter');
   await expect(
     page.getByRole('listitem').filter({ hasText: 'Current directory task' }),
@@ -160,4 +182,49 @@ test('shows the privacy policy and terms of service', async ({ page }) => {
   await command.press('Enter');
   await expect(feedback).toContainText('terms of service');
   await expect(feedback).toContainText('provided “as is” and “as available,”');
+});
+
+test('supports the canonical terminal command workflow', async ({ page }) => {
+  await page.goto('/');
+  const command = page.getByRole('textbox', { name: 'Command', exact: true });
+  const status = page.getByRole('region', { name: 'Command status' });
+
+  await command.fill('add Ship release directory Work due tomorrow');
+  await command.press('Enter');
+  await command.fill('dir Work');
+  await command.press('Enter');
+  await expect(page.getByRole('listitem').filter({ hasText: 'Ship release' })).toBeVisible();
+
+  await command.fill('show 1');
+  await command.press('Enter');
+  await expect(status).toContainText('directory: Work');
+  await expect(status).toContainText('notes: none');
+
+  await command.fill('theme dark');
+  await command.press('Enter');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.getByRole('combobox', { name: 'Theme' })).toHaveCount(0);
+
+  await command.fill('clear');
+  await command.press('Enter');
+  await expect(status).toBeHidden();
+
+  await command.fill('done 1');
+  await command.press('Enter');
+  await command.fill('undo');
+  await command.press('Enter');
+  await expect(page.getByRole('button', { name: 'Complete Ship release' })).toBeVisible();
+
+  await command.fill('dir add Empty');
+  await command.press('Enter');
+  await command.fill('dir archive Empty');
+  await command.press('Enter');
+  await command.fill('dir archived');
+  await command.press('Enter');
+  await expect(status).toContainText('Empty');
+  await command.fill('dir restore Empty');
+  await command.press('Enter');
+  await command.fill('dir Empty');
+  await command.press('Enter');
+  await expect(page.getByText('~/Empty >')).toBeVisible();
 });

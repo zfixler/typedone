@@ -136,6 +136,8 @@ export function createCommandBar(
     event.preventDefault();
     input.disabled = true;
     submit.disabled = true;
+    form.dataset.busy = 'true';
+    submit.textContent = 'Running…';
     void onSubmit(input.value)
       .then((succeeded) => {
         if (succeeded) input.value = '';
@@ -144,6 +146,8 @@ export function createCommandBar(
       .finally(() => {
         input.disabled = false;
         submit.disabled = false;
+        delete form.dataset.busy;
+        submit.textContent = 'Run';
         input.focus();
       });
   });

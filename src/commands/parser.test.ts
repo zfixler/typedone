@@ -7,6 +7,12 @@ describe('command parser', () => {
     ['/complete 2', { type: 'complete', taskNumber: 2 }],
     ['/restore 1', { type: 'restore', taskNumber: 1 }],
     ['/delete 4', { type: 'delete', taskNumber: 4 }],
+    ['done 3', { type: 'complete', taskNumber: 3 }],
+    ['x 2', { type: 'complete', taskNumber: 2 }],
+    ['show 1', { type: 'show', taskNumber: 1 }],
+    ['undo', { type: 'undo' }],
+    ['theme dark', { type: 'theme', theme: 'dark' }],
+    ['clear', { type: 'clear' }],
     ['f revised drawing', { type: 'search', query: 'revised drawing' }],
     ['today', { type: 'navigate', view: 'today' }],
     ['dir Home', { type: 'navigate-project', projectName: 'Home' }],
@@ -17,6 +23,8 @@ describe('command parser', () => {
     ['/note 2 none', { type: 'note', taskNumber: 2, value: 'none' }],
     ['/privacy', { type: 'legal', document: 'privacy' }],
     ['/terms', { type: 'legal', document: 'terms' }],
+    ['dir archived', { type: 'project-archived' }],
+    ['dir restore Work', { type: 'project-restore', name: 'Work' }],
   ])('parses %s', (input, command) => {
     expect(parseCommand(input)).toEqual({ status: 'success', command });
   });
@@ -30,16 +38,29 @@ describe('command parser', () => {
       status: 'success',
       command: { type: 'add', title: 'Send quote', due: '9/25/2026', projectName: 'Work' },
     });
+    expect(parseCommand('add Send quote due tomorrow directory Work')).toEqual({
+      status: 'success',
+      command: { type: 'add', title: 'Send quote', due: 'tomorrow', projectName: 'Work' },
+    });
   });
 
-  it('treats project and due as title words without flags', () => {
-    expect(parseCommand('add Discuss project due dates')).toEqual({
+  it('preserves reserved words inside a quoted title', () => {
+    expect(parseCommand('add "Discuss project due dates"')).toEqual({
       status: 'success',
       command: {
         type: 'add',
         title: 'Discuss project due dates',
         due: null,
         projectName: null,
+      },
+    });
+    expect(parseCommand('add Directory task --dir Work')).toEqual({
+      status: 'success',
+      command: {
+        type: 'add',
+        title: 'Directory task',
+        due: null,
+        projectName: 'Work',
       },
     });
   });
@@ -81,6 +102,7 @@ describe('command parser', () => {
     expect(parseCommand('add').status).toBe('incomplete');
     expect(parseCommand('add "unfinished').status).toBe('incomplete');
     expect(parseCommand('wat').status).toBe('error');
-    expect(parseCommand('done 1').status).toBe('error');
+    expect(parseCommand('done').status).toBe('incomplete');
+    expect(parseCommand('theme blue').status).toBe('incomplete');
   });
 });

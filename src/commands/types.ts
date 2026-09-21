@@ -3,6 +3,7 @@ export type ParsedCommand =
   | { type: 'complete'; taskNumber: number }
   | { type: 'restore'; taskNumber: number }
   | { type: 'delete'; taskNumber: number }
+  | { type: 'show'; taskNumber: number }
   | {
       type: 'edit';
       taskNumber: number;
@@ -18,7 +19,12 @@ export type ParsedCommand =
   | { type: 'project-add'; name: string }
   | { type: 'project-rename'; currentName: string; newName: string }
   | { type: 'project-archive'; name: string }
+  | { type: 'project-archived' }
+  | { type: 'project-restore'; name: string }
   | { type: 'project-delete'; name: string }
+  | { type: 'undo' }
+  | { type: 'theme'; theme: 'system' | 'light' | 'dark' }
+  | { type: 'clear' }
   | { type: 'legal'; document: 'privacy' | 'terms' }
   | { type: 'help'; topic: string | null };
 

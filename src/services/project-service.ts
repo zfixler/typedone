@@ -42,6 +42,12 @@ export class ProjectService {
     return updated;
   }
 
+  async restore(project: Project): Promise<Project> {
+    const updated = { ...project, archivedAt: null, updatedAt: new Date().toISOString() };
+    await this.repository.put(updated);
+    return updated;
+  }
+
   async delete(project: Project): Promise<void> {
     await this.repository.delete(project.id);
   }
