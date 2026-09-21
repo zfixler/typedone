@@ -17,6 +17,8 @@ test('onboards a first-time user and undoes task completion', async ({ page }) =
   await command.press('Enter');
   await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible();
   await expect(page.getByText('1 task', { exact: true })).toBeVisible();
+  await command.press('ArrowUp');
+  await expect(command).toHaveValue('add Keep this task');
 
   await command.fill('/done 1');
   await command.press('Enter');
@@ -27,6 +29,27 @@ test('onboards a first-time user and undoes task completion', async ({ page }) =
   const status = page.getByRole('region', { name: 'Command status' });
   await status.getByRole('button', { name: 'Dismiss status' }).click();
   await expect(status).toBeHidden();
+});
+
+test('shows transient feedback without shifting content', async ({ page }) => {
+  await page.goto('/');
+  const command = page.getByRole('textbox', { name: 'Command', exact: true });
+  const heading = page.getByRole('heading', { name: 'Inbox' });
+  const before = await heading.boundingBox();
+
+  await command.fill('theme dark');
+  await command.press('Enter');
+  const toast = page.getByRole('region', { name: 'Command status' });
+  await expect(toast).toBeVisible();
+  await expect(toast.getByRole('button', { name: 'Dismiss status' })).toHaveText('×');
+  const toastBox = await toast.boundingBox();
+  const viewport = page.viewportSize();
+  expect(
+    Math.abs((toastBox?.x ?? 0) + (toastBox?.width ?? 0) / 2 - (viewport?.width ?? 0) / 2),
+  ).toBeLessThan(2);
+  await expect(toast.locator('.toast-progress')).toBeVisible();
+  expect(await heading.boundingBox()).toEqual(before);
+  await expect(toast).toBeHidden({ timeout: 5000 });
 });
 
 test('creates, persists, completes, and restores a task through commands', async ({ page }) => {
@@ -62,6 +85,19 @@ test('lists and opens user directories with the slash command', async ({ page })
   await command.press('Enter');
   await expect(page.getByText('~/Work >')).toBeVisible();
   await expect(page.getByRole('listitem').filter({ hasText: 'Directory task' })).toBeVisible();
+});
+
+test('rolls back an automatically created directory when task creation fails', async ({ page }) => {
+  await page.goto('/');
+  const command = page.getByRole('textbox', { name: 'Command', exact: true });
+  await command.fill(`add ${'x'.repeat(301)} directory Orphan`);
+  await command.press('Enter');
+  await expect(page.getByRole('region', { name: 'Command status' })).toContainText(
+    'Title must be between 1 and 300 characters.',
+  );
+
+  await command.fill('/dirs');
+  await expect(page.getByRole('option', { name: 'Orphan' })).toHaveCount(0);
 });
 
 test('selects a user directory from the unified directory options', async ({ page }) => {
@@ -187,7 +223,7 @@ test('shows the privacy policy and terms of service', async ({ page }) => {
 test('supports the canonical terminal command workflow', async ({ page }) => {
   await page.goto('/');
   const command = page.getByRole('textbox', { name: 'Command', exact: true });
-  const status = page.getByRole('region', { name: 'Command status' });
+  const output = page.getByRole('region', { name: 'Command output' });
 
   await command.fill('add Ship release directory Work due tomorrow');
   await command.press('Enter');
@@ -197,8 +233,8 @@ test('supports the canonical terminal command workflow', async ({ page }) => {
 
   await command.fill('show 1');
   await command.press('Enter');
-  await expect(status).toContainText('directory: Work');
-  await expect(status).toContainText('notes: none');
+  await expect(output).toContainText('directory: Work');
+  await expect(output).toContainText('notes: none');
 
   await command.fill('theme dark');
   await command.press('Enter');
@@ -207,7 +243,7 @@ test('supports the canonical terminal command workflow', async ({ page }) => {
 
   await command.fill('clear');
   await command.press('Enter');
-  await expect(status).toBeHidden();
+  await expect(output).toBeHidden();
 
   await command.fill('done 1');
   await command.press('Enter');
@@ -221,7 +257,7 @@ test('supports the canonical terminal command workflow', async ({ page }) => {
   await command.press('Enter');
   await command.fill('dir archived');
   await command.press('Enter');
-  await expect(status).toContainText('Empty');
+  await expect(output).toContainText('Empty');
   await command.fill('dir restore Empty');
   await command.press('Enter');
   await command.fill('dir Empty');

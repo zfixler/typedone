@@ -101,8 +101,7 @@ export function parseCommand(input: string): ParseResult {
       value,
     });
   }
-  if (name === 'dir' || name === 'directory' || name === 'project' || name === 'p')
-    return parseDirectory(arguments_);
+  if (name === 'directory' || name === 'project' || name === 'p') return parseDirectory(arguments_);
   if (name === 'add' || name === 'a') return parseAdd(arguments_);
   return error(`Unknown command “${rawName}”. Type “help” to see commands.`);
 }

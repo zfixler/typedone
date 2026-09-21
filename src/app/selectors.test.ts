@@ -21,7 +21,6 @@ const task = (id: string, overrides: Partial<Task> = {}): Task => ({
 
 const state = (overrides: Partial<AppState>): AppState => ({
   ...initialState,
-  loading: false,
   ...overrides,
 });
 

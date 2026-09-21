@@ -11,7 +11,6 @@ export interface AppState {
   tasks: Task[];
   projects: Project[];
   theme: Theme;
-  loading: boolean;
   showAllUpcoming: boolean;
 }
 
@@ -31,7 +30,6 @@ export const initialState: AppState = {
   tasks: [],
   projects: [],
   theme: 'system',
-  loading: true,
   showAllUpcoming: false,
 };
 

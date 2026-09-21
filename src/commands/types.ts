@@ -13,7 +13,6 @@ export type ParsedCommand =
   | { type: 'note'; taskNumber: number; value: string }
   | { type: 'navigate'; view: 'inbox' | 'today' | 'upcoming' | 'completed' }
   | { type: 'navigate-project'; projectName: string }
-  | { type: 'project-list' }
   | { type: 'directory-list' }
   | { type: 'search'; query: string }
   | { type: 'project-add'; name: string }

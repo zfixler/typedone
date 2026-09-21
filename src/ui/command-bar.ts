@@ -44,7 +44,8 @@ export function createCommandBar(
   suggestions.hidden = true;
   input.setAttribute('aria-controls', suggestions.id);
   input.setAttribute('aria-expanded', 'false');
-  let historyIndex = history.length;
+  const commandHistory = [...history];
+  let historyIndex = commandHistory.length;
   let currentSuggestions: readonly CommandSuggestion[] = [];
   let suggestionIndex = -1;
 
@@ -127,20 +128,28 @@ export function createCommandBar(
     historyIndex =
       event.key === 'ArrowUp'
         ? Math.max(0, historyIndex - 1)
-        : Math.min(history.length, historyIndex + 1);
-    input.value = history[historyIndex] ?? '';
+        : Math.min(commandHistory.length, historyIndex + 1);
+    input.value = commandHistory[historyIndex] ?? '';
     input.setSelectionRange(input.value.length, input.value.length);
   });
   input.addEventListener('input', renderSuggestions);
   form.addEventListener('submit', (event) => {
     event.preventDefault();
+    const submittedInput = input.value.trim();
     input.disabled = true;
     submit.disabled = true;
     form.dataset.busy = 'true';
     submit.textContent = 'Running…';
     void onSubmit(input.value)
       .then((succeeded) => {
-        if (succeeded) input.value = '';
+        if (succeeded) {
+          if (submittedInput && commandHistory.at(-1) !== submittedInput) {
+            commandHistory.push(submittedInput);
+            if (commandHistory.length > 100) commandHistory.shift();
+          }
+          historyIndex = commandHistory.length;
+          input.value = '';
+        }
         hideSuggestions();
       })
       .finally(() => {

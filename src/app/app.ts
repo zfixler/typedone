@@ -6,6 +6,12 @@ import { normalizeProjectName } from '../domain/validation';
 import { ProjectService } from '../services/project-service';
 import { TaskService, type TaskInput } from '../services/task-service';
 import { createCommandBar, type CommandBarController } from '../ui/command-bar';
+import {
+  createCommandFeedback,
+  type FeedbackAction,
+  type FeedbackKind,
+} from '../ui/command-feedback';
+import { getCommandSuggestions } from '../ui/command-suggestions';
 import { createConfirmationDialog } from '../ui/confirmation-dialog';
 import { createTaskList } from '../ui/task-list';
 import { parseDateExpression } from '../utilities/dates';
@@ -59,10 +65,20 @@ The service is provided “as is” and “as available,” without warranties o
 We may change, suspend, or discontinue the service and may update these terms. Continued use after an update means you accept the revised terms. If you do not accept these terms, stop using TypeDone.`;
 
 const BUILT_IN_DIRECTORIES = ['inbox', 'today', 'upcoming', 'completed'] as const;
-interface UndoAction {
-  label: string;
-  run: () => Promise<void>;
-}
+const OUTPUT_COMMANDS = new Set<ParsedCommand['type']>([
+  'help',
+  'legal',
+  'show',
+  'directory-list',
+  'project-archived',
+]);
+const NON_REVERSIBLE_MUTATIONS = new Set<ParsedCommand['type']>([
+  'add',
+  'edit',
+  'note',
+  'project-add',
+  'theme',
+]);
 
 const isTheme = (value: unknown): value is Theme =>
   value === 'system' || value === 'light' || value === 'dark';
@@ -84,7 +100,6 @@ export async function createApp(repositories: Repositories): Promise<HTMLElement
     projects,
     theme: isTheme(storedTheme) ? storedTheme : 'system',
     showAllUpcoming: showAllUpcoming === true,
-    loading: false,
   });
   applyTheme(store.getState().theme);
   const taskService = new TaskService(repositories.tasks);
@@ -97,62 +112,40 @@ export async function createApp(repositories: Repositories): Promise<HTMLElement
   const brand = document.createElement('span');
   brand.textContent = 'TypeDone';
   masthead.append(brand);
-  const feedback = document.createElement('section');
-  feedback.className = 'command-feedback';
-  feedback.setAttribute('aria-label', 'Command status');
-  feedback.setAttribute('aria-live', 'polite');
-  feedback.hidden = true;
-  const feedbackMessage = document.createElement('pre');
-  const feedbackActions = document.createElement('div');
-  feedbackActions.className = 'feedback-actions';
-  feedback.append(feedbackMessage, feedbackActions);
-  let feedbackTimer: number | undefined;
-  let currentUndo: UndoAction | null = null;
-
-  const hideFeedback = (): void => {
-    feedback.hidden = true;
-    if (feedbackTimer !== undefined) window.clearTimeout(feedbackTimer);
-  };
+  const feedback = createCommandFeedback();
+  let currentUndo: FeedbackAction | null = null;
   const announce = (
     message: string,
-    kind: 'success' | 'error' | 'info' = 'success',
-    undo?: UndoAction,
+    kind: FeedbackKind = 'success',
+    undo?: FeedbackAction,
   ): void => {
-    if (feedbackTimer !== undefined) window.clearTimeout(feedbackTimer);
-    feedback.hidden = false;
-    feedback.dataset.kind = kind;
-    feedbackMessage.textContent = message;
-    feedbackActions.replaceChildren();
-    if (undo) {
-      currentUndo = undo;
-      const undoButton = document.createElement('button');
-      undoButton.type = 'button';
-      undoButton.textContent = undo.label;
-      undoButton.addEventListener('click', () => {
-        undoButton.disabled = true;
-        currentUndo = null;
-        void undo.run().then(() => {
-          announce('Action undone.');
-        });
-      });
-      feedbackActions.append(undoButton);
-    }
-    const dismiss = document.createElement('button');
-    dismiss.type = 'button';
-    dismiss.setAttribute('aria-label', 'Dismiss status');
-    dismiss.textContent = 'Dismiss';
-    dismiss.addEventListener('click', hideFeedback);
-    feedbackActions.append(dismiss);
-    if (kind === 'success') feedbackTimer = window.setTimeout(hideFeedback, 6000);
+    if (undo) currentUndo = undo;
+    feedback.announce(
+      message,
+      kind,
+      undo
+        ? {
+            label: undo.label,
+            run: async () => {
+              await undo.run();
+              if (currentUndo === undo) currentUndo = null;
+            },
+          }
+        : undefined,
+    );
   };
   const recordHistory = async (input: string, succeeded: boolean): Promise<void> => {
     if (!input.trim()) return;
-    await repositories.commandHistory.add({
-      id: createId(),
-      input: input.trim(),
-      executedAt: new Date().toISOString(),
-      succeeded,
-    });
+    try {
+      await repositories.commandHistory.add({
+        id: createId(),
+        input: input.trim(),
+        executedAt: new Date().toISOString(),
+        succeeded,
+      });
+    } catch (error) {
+      console.error('Command history could not be saved.', error);
+    }
   };
   const execute = async (command: ParsedCommand): Promise<string> => {
     const state = store.getState();
@@ -199,19 +192,19 @@ export async function createApp(repositories: Repositories): Promise<HTMLElement
         return topic ? (HELP_TOPICS[topic] ?? `No help topic for “${topic}”.\n\n${HELP}`) : HELP;
       }
       case 'clear':
-        hideFeedback();
+        feedback.hide();
         return '';
       case 'undo': {
         if (!currentUndo) throw new Error('There is nothing to undo.');
         const undo = currentUndo;
-        currentUndo = null;
         await undo.run();
+        if (currentUndo === undo) currentUndo = null;
         return 'Action undone.';
       }
       case 'theme':
+        await repositories.settings.put('theme', command.theme);
         applyTheme(command.theme);
         store.setState({ theme: command.theme });
-        await repositories.settings.put('theme', command.theme);
         return `theme: ${command.theme}`;
       case 'legal':
         return command.document === 'privacy' ? PRIVACY_POLICY : TERMS_OF_SERVICE;
@@ -231,7 +224,6 @@ export async function createApp(repositories: Repositories): Promise<HTMLElement
         });
         return `view: ${project.name}`;
       }
-      case 'project-list':
       case 'directory-list': {
         const userDirectories = state.projects
           .filter(({ archivedAt }) => archivedAt === null)
@@ -265,6 +257,10 @@ export async function createApp(repositories: Repositories): Promise<HTMLElement
         ].join('\n');
       }
       case 'add': {
+        const date = command.due
+          ? parseDateExpression(command.due)
+          : { status: 'success' as const, value: null };
+        if (date.status === 'error') throw new Error(date.message);
         let project: Project | null =
           state.activeView === 'project'
             ? (state.projects.find(
@@ -288,20 +284,31 @@ export async function createApp(repositories: Repositories): Promise<HTMLElement
             createdProject = true;
           }
         }
-        const date = command.due
-          ? parseDateExpression(command.due)
-          : { status: 'success' as const, value: null };
-        if (date.status === 'error') throw new Error(date.message);
-        const task = await taskService.create(
-          {
-            title: command.title,
-            notes: '',
-            projectId: project?.id ?? null,
-            dueDate: date.value,
-          },
-          availableProjects,
-          state.tasks,
-        );
+        let task: Task;
+        try {
+          task = await taskService.create(
+            {
+              title: command.title,
+              notes: '',
+              projectId: project?.id ?? null,
+              dueDate: date.value,
+            },
+            availableProjects,
+            state.tasks,
+          );
+        } catch (error) {
+          if (createdProject && project) {
+            try {
+              await projectService.delete(project);
+            } catch (cleanupError) {
+              console.error(
+                'The automatically created directory could not be rolled back.',
+                cleanupError,
+              );
+            }
+          }
+          throw error;
+        }
         store.setState({
           projects: availableProjects,
           tasks: [...state.tasks, task],
@@ -470,7 +477,7 @@ export async function createApp(repositories: Repositories): Promise<HTMLElement
       }
       case 'project-restore': {
         const project = resolveArchivedProject(command.name);
-        const restored = await projectService.restore(project);
+        const restored = await projectService.restore(project, state.projects);
         store.setState({
           projects: state.projects.map((candidate) =>
             candidate.id === restored.id ? restored : candidate,
@@ -548,12 +555,14 @@ export async function createApp(repositories: Repositories): Promise<HTMLElement
       return false;
     }
     try {
+      const previousUndo = currentUndo;
       const message = await execute(parsed.command);
-      if (message)
-        announce(
-          message,
-          parsed.command.type === 'help' || parsed.command.type === 'legal' ? 'info' : 'success',
-        );
+      if (NON_REVERSIBLE_MUTATIONS.has(parsed.command.type) && currentUndo === previousUndo) {
+        currentUndo = null;
+      }
+      if (message) {
+        announce(message, OUTPUT_COMMANDS.has(parsed.command.type) ? 'info' : 'success');
+      }
       await recordHistory(input, true);
       return true;
     } catch (error) {
@@ -570,111 +579,7 @@ export async function createApp(repositories: Repositories): Promise<HTMLElement
   const commandBar = createCommandBar(
     historyEntries.filter(({ succeeded }) => succeeded).map(({ input }) => input),
     run,
-    (input) => {
-      const raw = input.trim().toLocaleLowerCase();
-      const slash = raw.startsWith('/');
-      const command = raw.replace(/^\//, '');
-      const topLevel = [
-        ['add', 'Create a task'],
-        ['done', 'Complete a task'],
-        ['restore', 'Restore a task'],
-        ['show', 'Inspect a task'],
-        ['edit', 'Edit a task'],
-        ['note', 'Edit task notes'],
-        ['delete', 'Delete a task'],
-        ['inbox', 'Open Inbox'],
-        ['today', 'Open Today'],
-        ['upcoming', 'Open Upcoming'],
-        ['completed', 'Open Completed'],
-        ['dir', 'Browse directories'],
-        ['find', 'Search tasks'],
-        ['undo', 'Undo the latest action'],
-        ['theme', 'Change theme'],
-        ['clear', 'Dismiss status'],
-        ['help', 'Show command help'],
-      ] as const;
-      if (!command.includes(' ')) {
-        const exact = topLevel.some(([value]) => value === command);
-        const needsArguments = [
-          'add',
-          'done',
-          'restore',
-          'show',
-          'edit',
-          'note',
-          'delete',
-          'dir',
-          'find',
-          'theme',
-        ];
-        if (!exact || raw === '/') {
-          const matches = topLevel.filter(([value]) => value.startsWith(command));
-          if (matches.length > 0 || raw === '/') {
-            return matches.map(([value, label]) => ({
-              label: `${value} — ${label}`,
-              value: `${slash ? '/' : ''}${value}`,
-              submit: !needsArguments.includes(value),
-            }));
-          }
-        }
-      }
-      if (command === 'dir' || command === 'dirs') {
-        const builtIns = [
-          ['Inbox', 'All unassigned active tasks'],
-          ['Today', 'Due today or overdue'],
-          ['Upcoming', 'Future tasks'],
-          ['Completed', 'Completed tasks'],
-        ].map(([name = '', label = '']) => ({
-          label: `${name} — ${label}`,
-          value: `${slash ? '/' : ''}dir ${name.toLocaleLowerCase()}`,
-        }));
-        const userDirectories = store
-          .getState()
-          .projects.filter(({ archivedAt }) => archivedAt === null)
-          .sort(
-            (left, right) =>
-              left.sortOrder - right.sortOrder || left.name.localeCompare(right.name),
-          )
-          .map(({ name }) => ({ label: name, value: `${slash ? '/' : ''}dir ${name}` }));
-        return [...builtIns, ...userDirectories];
-      }
-      if (command === 'theme') {
-        return (['system', 'light', 'dark'] as const).map((theme) => ({
-          label: `${theme} theme`,
-          value: `${slash ? '/' : ''}theme ${theme}`,
-        }));
-      }
-      const dateMatch = /(?:due|-d)\s+([^\s]*)$/i.exec(input);
-      if (dateMatch) {
-        const prefix = dateMatch[1]?.toLocaleLowerCase() ?? '';
-        const dates = ['today', 'tomorrow', 'monday', 'friday'];
-        if (dates.includes(prefix)) return [];
-        return dates
-          .filter((value) => value.startsWith(prefix))
-          .map((value) => ({
-            label: value,
-            value: input.slice(0, input.length - prefix.length) + value,
-            submit: false,
-          }));
-      }
-      const taskCommands = [
-        'done',
-        'complete',
-        'x',
-        'restore',
-        'show',
-        'view',
-        'delete',
-        'edit',
-        'note',
-      ];
-      if (!taskCommands.includes(command)) return [];
-      return selectVisibleTasks(store.getState()).map((task, index) => ({
-        label: `${String(index + 1).padStart(2, '0')}  ${task.title}`,
-        value: `${slash ? '/' : ''}${command} ${String(index + 1)}${command === 'edit' || command === 'note' ? ' ' : ''}`,
-        submit: command !== 'edit' && command !== 'note',
-      }));
-    },
+    (input) => getCommandSuggestions(input, store.getState()),
   );
   const taskList = createTaskList(
     store,
@@ -685,7 +590,14 @@ export async function createApp(repositories: Repositories): Promise<HTMLElement
       commandBar.focus(value);
     },
   );
-  shell.append(masthead, feedback, commandBar.element, taskList, confirmation.element);
+  shell.append(
+    masthead,
+    feedback.outputElement,
+    commandBar.element,
+    taskList,
+    feedback.toastElement,
+    confirmation.element,
+  );
   const updatePrompt = (): void => {
     const current = store.getState();
     const project = current.projects.find(({ id }) => id === current.activeProjectId);

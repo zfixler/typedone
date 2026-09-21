@@ -42,8 +42,9 @@ export class ProjectService {
     return updated;
   }
 
-  async restore(project: Project): Promise<Project> {
+  async restore(project: Project, projects: readonly Project[]): Promise<Project> {
     const updated = { ...project, archivedAt: null, updatedAt: new Date().toISOString() };
+    this.assertValid(updated, projects);
     await this.repository.put(updated);
     return updated;
   }

@@ -161,7 +161,8 @@
   display: none;
 }
 
-.command-feedback {
+.command-feedback,
+.command-toast {
   display: flex;
   align-items: start;
   justify-content: space-between;
@@ -176,11 +177,55 @@
   box-shadow: var(--shadow-raised);
 }
 
-.command-feedback[hidden] {
+.command-toast {
+  position: fixed;
+  z-index: 20;
+  inset: var(--space-4) auto auto 50%;
+  translate: -50% 0;
+  width: min(26rem, calc(100% - 2rem));
+  max-height: min(20rem, calc(100vh - 2rem));
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-inline-start: 0.25rem solid var(--color-accent);
+  border-radius: var(--radius);
+  padding-inline-end: 3rem;
+  overflow: hidden;
+  animation: toast-enter 160ms ease-out;
+}
+
+.command-toast .toast-dismiss {
+  position: absolute;
+  inset: var(--space-2) var(--space-2) auto auto;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  min-height: 2rem;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  font: 1.25rem/1 var(--font-sans);
+}
+
+.toast-progress {
+  position: absolute;
+  inset: auto 0 0;
+  height: 0.1875rem;
+  background: var(--color-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.command-toast[data-kind='error'] .toast-progress {
+  background: var(--color-danger);
+}
+
+.command-feedback[hidden],
+.command-toast[hidden] {
   display: none;
 }
 
-.command-feedback pre {
+.command-feedback pre,
+.command-toast pre {
   min-width: 0;
   margin: 0;
   font: 0.8rem/1.6 var(--font-mono);
@@ -198,9 +243,28 @@
   padding-inline: var(--space-2);
 }
 
-.command-feedback[data-kind='error'] {
+.command-feedback[data-kind='error'],
+.command-toast[data-kind='error'] {
   border-color: var(--color-danger);
   color: var(--color-danger);
+}
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .command-toast {
+    animation: none;
+  }
 }
 
 .command-bar {
@@ -351,9 +415,16 @@ dialog::backdrop {
     grid-column: 3;
   }
 
-  .command-feedback {
+  .command-feedback,
+  .command-toast {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .command-toast {
+    inset: var(--space-3) var(--space-3) auto;
+    translate: none;
+    width: auto;
   }
 
   .feedback-actions {
