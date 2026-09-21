@@ -108,14 +108,26 @@ export function createTaskList(
           note.textContent = `• ${task.notes}`;
           action.append(note);
         }
+        const metadata = document.createElement('span');
+        metadata.className = 'task-meta';
+        if (task.projectId && state.activeView !== 'project') {
+          const directory = state.projects.find(({ id }) => id === task.projectId);
+          if (directory) {
+            const directoryLabel = document.createElement('span');
+            directoryLabel.className = 'task-directory';
+            directoryLabel.textContent = directory.name;
+            metadata.append(directoryLabel);
+          }
+        }
         if (task.dueDate) {
           const due = document.createElement('time');
           due.dateTime = task.dueDate;
           due.className =
             task.dueDate < today && !task.completedAt ? 'task-due is-overdue' : 'task-due';
           due.textContent = formatFriendlyDate(task.dueDate);
-          action.append(due);
+          metadata.append(due);
         }
+        if (metadata.childElementCount > 0) action.append(metadata);
         row.append(action);
         return row;
       }),

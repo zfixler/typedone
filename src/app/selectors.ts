@@ -11,7 +11,7 @@ export function selectVisibleTasks(state: Readonly<AppState>, now: Date = new Da
 
   switch (state.activeView) {
     case 'inbox':
-      return incomplete.filter(({ projectId }) => projectId === null).sort(byManualOrder);
+      return incomplete.sort(byManualOrder);
     case 'today':
       return incomplete
         .filter(({ dueDate }) => dueDate !== null && dueDate <= today)

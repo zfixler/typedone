@@ -79,12 +79,14 @@ test('lists and opens user directories with the slash command', async ({ page })
   const command = page.getByRole('textbox', { name: 'Command', exact: true });
   await command.fill('add Directory task --dir Work');
   await command.press('Enter');
+  const taskRow = page.getByRole('listitem').filter({ hasText: 'Directory task' });
+  await expect(taskRow).toContainText('Work');
   await command.fill('/dirs');
   await expect(page.getByRole('option', { name: 'Work' })).toBeVisible();
   await command.fill('/dir Work');
   await command.press('Enter');
   await expect(page.getByText('~/Work >')).toBeVisible();
-  await expect(page.getByRole('listitem').filter({ hasText: 'Directory task' })).toBeVisible();
+  await expect(taskRow).toBeVisible();
 });
 
 test('rolls back an automatically created directory when task creation fails', async ({ page }) => {
@@ -135,7 +137,7 @@ test('adds a task to the current user directory without a directory flag', async
   await command.press('Enter');
   await expect(
     page.getByRole('listitem').filter({ hasText: 'Current directory task' }),
-  ).toBeHidden();
+  ).toContainText('Work');
 });
 
 test('edits and deletes a user directory while preserving its tasks', async ({ page }) => {

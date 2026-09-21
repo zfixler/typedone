@@ -25,7 +25,7 @@ const state = (overrides: Partial<AppState>): AppState => ({
 });
 
 describe('view selection', () => {
-  it('filters and manually sorts inbox tasks', () => {
+  it('includes directory tasks and manually sorts active inbox tasks', () => {
     const tasks = [
       task('1', { sortOrder: 2 }),
       task('2', { sortOrder: 1 }),
@@ -34,7 +34,7 @@ describe('view selection', () => {
     ];
     expect(
       selectVisibleTasks(state({ activeView: 'inbox', tasks }), now).map(({ id }) => id),
-    ).toEqual(['2', '1']);
+    ).toEqual(['3', '2', '1']);
   });
 
   it('sorts overdue tasks before today tasks', () => {
