@@ -11,6 +11,13 @@ test('onboards a first-time user and undoes task completion', async ({ page }) =
   await page.goto('/');
   const command = page.getByRole('textbox', { name: 'Command', exact: true });
 
+  const example = page.getByRole('button', {
+    name: 'add Take out the trash -d tomorrow',
+  });
+  await expect(example).toBeVisible();
+  await example.click();
+  await expect(command).toHaveValue('add Take out the trash -d tomorrow');
+
   await page.getByRole('button', { name: '1. Add a task' }).click();
   await expect(command).toHaveValue('add ');
   await command.fill('add Keep this task');

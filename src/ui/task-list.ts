@@ -153,7 +153,7 @@ export function createTaskList(
     emptyAction.textContent = isSearch
       ? 'Try another search'
       : 'add Take out the trash -d tomorrow';
-    emptyAction.hidden = isCompleted || isFirstRun;
+    emptyAction.hidden = isCompleted;
   };
   render();
   store.subscribe(render);
