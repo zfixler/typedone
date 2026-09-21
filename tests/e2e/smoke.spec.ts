@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('loads the application shell', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByText('~/inbox >')).toBeVisible();
-  await expect(page.getByText('TypeDone', { exact: true })).toBeVisible();
+  await expect(page.getByText('TypeDone', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Command', exact: true })).toBeFocused();
 });
 
@@ -211,19 +211,20 @@ test('shows the privacy policy and terms of service', async ({ page }) => {
   await command.fill('/privacy');
   await command.press('Enter');
   const feedback = page.locator('.command-feedback');
-  await expect(feedback).toContainText('privacy policy');
+  await expect(feedback).toContainText('TypeDone privacy policy');
   await expect(feedback).toContainText(/stores your tasks.*locally in your browser/s);
+  await feedback.getByRole('button', { name: 'Close output' }).click();
 
   await command.fill('/terms');
   await command.press('Enter');
-  await expect(feedback).toContainText('terms of service');
+  await expect(feedback).toContainText('TypeDone terms of service');
   await expect(feedback).toContainText('provided “as is” and “as available,”');
 });
 
 test('supports the canonical terminal command workflow', async ({ page }) => {
   await page.goto('/');
   const command = page.getByRole('textbox', { name: 'Command', exact: true });
-  const output = page.getByRole('region', { name: 'Command output' });
+  const output = page.getByRole('dialog', { name: 'Command output' });
 
   await command.fill('add Ship release directory Work due tomorrow');
   await command.press('Enter');
@@ -235,6 +236,7 @@ test('supports the canonical terminal command workflow', async ({ page }) => {
   await command.press('Enter');
   await expect(output).toContainText('directory: Work');
   await expect(output).toContainText('notes: none');
+  await output.getByRole('button', { name: 'Close output' }).click();
 
   await command.fill('theme dark');
   await command.press('Enter');
@@ -258,6 +260,7 @@ test('supports the canonical terminal command workflow', async ({ page }) => {
   await command.fill('dir archived');
   await command.press('Enter');
   await expect(output).toContainText('Empty');
+  await output.getByRole('button', { name: 'Close output' }).click();
   await command.fill('dir restore Empty');
   await command.press('Enter');
   await command.fill('dir Empty');

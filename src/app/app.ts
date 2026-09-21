@@ -44,7 +44,7 @@ const HELP_TOPICS: Record<string, string> = {
   theme: 'theme <system|light|dark>\nSet and remember the app theme.',
 };
 
-const PRIVACY_POLICY = `privacy policy
+const PRIVACY_POLICY = `TypeDone privacy policy
 effective: September 18, 2026
 
 TypeDone stores your tasks, directories, settings, and command history locally in your browser using IndexedDB. TypeDone does not transmit that content to us and does not use advertising or analytics cookies.
@@ -55,7 +55,7 @@ Your local data remains until you delete it or clear this site's browser storage
 
 Do not store sensitive or regulated information in TypeDone. This policy may change as the service evolves; an updated effective date will be shown here.`;
 
-const TERMS_OF_SERVICE = `terms of service
+const TERMS_OF_SERVICE = `TypeDone terms of service
 effective: September 18, 2026
 
 TypeDone is provided for personal task management. By using it, you agree to use it lawfully and not to interfere with, probe, abuse, or disrupt the service or its infrastructure.
@@ -107,11 +107,6 @@ export async function createApp(repositories: Repositories): Promise<HTMLElement
   const confirmation = createConfirmationDialog();
   const shell = document.createElement('main');
   shell.className = 'terminal-shell';
-  const masthead = document.createElement('header');
-  masthead.className = 'masthead';
-  const brand = document.createElement('span');
-  brand.textContent = 'TypeDone';
-  masthead.append(brand);
   const feedback = createCommandFeedback();
   let currentUndo: FeedbackAction | null = null;
   const announce = (
@@ -591,7 +586,6 @@ export async function createApp(repositories: Repositories): Promise<HTMLElement
     },
   );
   shell.append(
-    masthead,
     feedback.outputElement,
     commandBar.element,
     taskList,

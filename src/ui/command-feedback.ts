@@ -33,7 +33,21 @@ function createSurface(className: string, label: string): FeedbackSurface {
 }
 
 export function createCommandFeedback(): CommandFeedbackController {
-  const output = createSurface('command-feedback', 'Command output');
+  const outputDialog = document.createElement('dialog');
+  outputDialog.className = 'command-feedback';
+  outputDialog.setAttribute('aria-label', 'Command output');
+  const outputContent = document.createElement('div');
+  outputContent.className = 'command-output-content';
+  const outputMessage = document.createElement('pre');
+  const outputActions = document.createElement('div');
+  outputActions.className = 'feedback-actions';
+  outputContent.append(outputMessage, outputActions);
+  outputDialog.append(outputContent);
+  const output: FeedbackSurface = {
+    element: outputDialog,
+    message: outputMessage,
+    actions: outputActions,
+  };
   const toast = createSurface('command-toast', 'Command status');
   toast.element.setAttribute('aria-live', 'polite');
   const progress = document.createElement('span');
@@ -48,7 +62,7 @@ export function createCommandFeedback(): CommandFeedbackController {
     progressAnimation = null;
   };
   const hideOutput = (): void => {
-    output.element.hidden = true;
+    if (outputDialog.open) outputDialog.close();
   };
   const startDismissal = (kind: 'success' | 'error'): void => {
     const animation = progress.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], {
@@ -71,7 +85,11 @@ export function createCommandFeedback(): CommandFeedbackController {
     const isOutput = kind === 'info';
     const surface = isOutput ? output : toast;
     if (!isOutput) hideToast();
-    surface.element.hidden = false;
+    if (isOutput) {
+      if (!outputDialog.open) outputDialog.showModal();
+    } else {
+      surface.element.hidden = false;
+    }
     surface.element.dataset.kind = kind;
     surface.message.textContent = message;
     surface.actions.replaceChildren();
@@ -97,8 +115,8 @@ export function createCommandFeedback(): CommandFeedbackController {
     }
     const dismiss = document.createElement('button');
     dismiss.type = 'button';
-    dismiss.setAttribute('aria-label', isOutput ? 'Dismiss output' : 'Dismiss status');
-    dismiss.textContent = isOutput ? 'Dismiss' : '×';
+    dismiss.setAttribute('aria-label', isOutput ? 'Close output' : 'Dismiss status');
+    dismiss.textContent = isOutput ? 'Close' : '×';
     if (!isOutput) dismiss.className = 'toast-dismiss';
     dismiss.addEventListener('click', isOutput ? hideOutput : hideToast);
     surface.actions.append(dismiss);
@@ -115,7 +133,7 @@ export function createCommandFeedback(): CommandFeedbackController {
   });
 
   return {
-    outputElement: output.element,
+    outputElement: outputDialog,
     toastElement: toast.element,
     announce,
     hide() {
